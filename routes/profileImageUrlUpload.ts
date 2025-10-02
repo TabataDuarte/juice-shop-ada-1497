@@ -13,6 +13,27 @@ import { UserModel } from '../models/user'
 import * as utils from '../lib/utils'
 import logger from '../lib/logger'
 
+// ALLOWLIST: Known good domains for profile images
+const ALLOWED_IMAGE_HOSTS = [
+  'images.example.com',
+  'cdn.example.net',
+  'assets.trusted.org'
+]
+
+function isAllowedImageUrl(urlString: string): boolean {
+  try {
+    const parsedUrl = new URL(urlString)
+    // Only allow http(s)
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      return false
+    }
+    // Hostname must match one in the allowlist
+    return ALLOWED_IMAGE_HOSTS.includes(parsedUrl.hostname)
+  } catch {
+    return false
+  }
+}
+
 export function profileImageUrlUpload () {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.body.imageUrl !== undefined) {
@@ -21,6 +42,9 @@ export function profileImageUrlUpload () {
       const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
       if (loggedInUser) {
         try {
+          if (!isAllowedImageUrl(url)) {
+            throw new Error('Image URL host is not permitted.')
+          }
           const response = await fetch(url)
           if (!response.ok || !response.body) {
             throw new Error('url returned a non-OK status code or an empty body')
